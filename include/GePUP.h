@@ -40,6 +40,10 @@ protected:
     Field Duu(const Field &u) const;
     Field XE(const Field &u, const double &t) const;
     ColVector bodyAve(TimeFunction2D *g, const double &t) const;
+    double normalFace(TimeFunction2D *const *g, const double &t, const idpair &j, const idpair &ed) const;
+    double normalPartialDivU(const Field &u, const idpair &j, const idpair &ed) const;
+    double normalPartialQ(const Field &u, TimeFunction2D *const *g, const double &t, const idpair &j, const idpair &ed) const;
+    double deltaUn(const Field &u, const idpair &j, const idpair &ed) const;
     ColVector solveQ(const Field &u, TimeFunction2D *const *, const double &t) const;
     double face(const ColVector &phi, const idpair &i, const idpair &ed) const;
     double GdVer(const ColVector &phi, const idpair &i, const idpair &ed) const;

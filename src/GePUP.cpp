@@ -132,8 +132,25 @@ ColVector GePUP::bodyAve(TimeFunction2D *g, const double &t) const{
     return res;
 }
 
+double GePUP::deltaUn(const Field &u, const idpair &j, const idpair &ed) const{
+    int d = ed[0] ? 0 : 1;
+    double fg = (ed[d]==1) ? 1 : -1;
+    return fg/(48.0*dH*dH) * ( -755.0*u[d](idx(j)) + 493.0*u[d](idx(j-ed)) - 191.0*u[d](idx(j-2*ed)) + 33.0*u[d](idx(j-3*ed)) );
+}
+
+double GePUP::normalFace(TimeFunction2D *const *g, const double &t, const idpair &j, const idpair &ed) const{
+}
+
+double GePUP::normalPartialDivU(const Field &u, const idpair &j, const idpair &ed) const{
+}
+
+double GePUP::normalPartialQ(const Field &u, TimeFunction2D *const *g, const double &t, const idpair &j, const idpair &ed) const{
+}
+
 ColVector GePUP::solveQ(const Field &u, TimeFunction2D *const * g, const double &t) const{
     ColVector rhs = D(g,t) - D(Duu(u));
+    // ...
+    return poissonNeumann.solve(rhs, "FMG", 8, eps);
 }
 
 Field GePUP::XE(const Field &u, const double &t) const{

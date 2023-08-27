@@ -27,8 +27,13 @@ public:
         return u[i];
     }
     Field& operator += (const Field &rhs){
-        u[0] = u[0] + rhs[0];
-        u[1] = u[1] + rhs[1];
+        u[0] += rhs[0];
+        u[1] += rhs[1];
+        return (*this);
+    }
+    Field& operator -= (const Field &rhs){
+        u[0] -= rhs[0];
+        u[1] -= rhs[1];
         return (*this);
     }
     friend Field operator * (const double &k, const Field &rhs){

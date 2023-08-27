@@ -36,9 +36,11 @@ protected:
     ColVector Gd(const ColVector &phi, const int &d) const;
     ColVector D(const Field &u) const;
     Field Proj(const Field &u) const;
-    ColVector D(const TimeFunction2D *g[2], const double &t) const;
+    ColVector D(TimeFunction2D *const *, const double &t) const;
     Field Duu(const Field &u) const;
     Field XE(const Field &u, const double &t) const;
+    ColVector bodyAve(TimeFunction2D *g, const double &t) const;
+    ColVector solveQ(const Field &u, TimeFunction2D *const *, const double &t) const;
     double face(const ColVector &phi, const idpair &i, const idpair &ed) const;
     double GdVer(const ColVector &phi, const idpair &i, const idpair &ed) const;
     double F(const ColVector &phi, const ColVector &psi, const idpair &i, const idpair &ed) const;

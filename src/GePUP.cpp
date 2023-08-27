@@ -82,7 +82,7 @@ Field GePUP::Proj(const Field &u) const{
     return Field( u[0]-Gd(tmp,0), u[1]-Gd(tmp,1) );
 }
 
-ColVector GePUP::D(const TimeFunction2D *g[2], const double &t) const{
+ColVector GePUP::D(TimeFunction2D *const *g, const double &t) const{
     // Compute the body-average integration of div(g), with the divergence theorem.
     ColVector res(M*M);
     for(int i = 0; i < M; i++)
@@ -120,6 +120,30 @@ Field GePUP::Duu(const Field &u) const{
                     res[dm](idx(id)) += (F(u[d],u[dm],id,ed) - F(u[d],u[dm],id,ed)) / dH;
                 }
             }
+    return res;
+}
+
+ColVector GePUP::bodyAve(TimeFunction2D *g, const double &t) const{
+    ColVector res(M*M);
+    for(int i = 0; i < M; i++)
+        for(int j = 0; j < M; j++){
+            res(idx(i,j)) = g->int2D_order6(i*dH, (i+1)*dH, j*dH, (j+1)*dH, t);
+        }
+    return res;
+}
+
+ColVector GePUP::solveQ(const Field &u, TimeFunction2D *const * g, const double &t) const{
+    ColVector rhs = D(g,t) - D(Duu(u));
+}
+
+Field GePUP::XE(const Field &u, const double &t) const{
+    Field res;
+    res[0] = bodyAve(g[0],t);
+    res[1] = bodyAve(g[1],t);
+    res -= Duu(u);
+    auto q = solveQ(u,g,t);
+    res[0] -= Gd(q,0);
+    res[1] -= Gd(q,1);
     return res;
 }
 

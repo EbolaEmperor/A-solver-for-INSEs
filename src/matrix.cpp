@@ -143,6 +143,28 @@ ColVector Matrix::getCol(const int &c) const{
     return res;
 }
 
+Matrix& Matrix::operator += (const Matrix &B) {
+    if(n!=B.n || m!=B.m){
+        std::cerr << "Matrix Error! Undefined Addition!" << std::endl;
+        exit(-1);
+    }
+    for(int i = 0; i < n; i++)
+        for(int j = 0; j < m; j++)
+            element(i,j) += B(i, j);
+    return (*this);
+}
+
+Matrix& Matrix::operator -= (const Matrix &B) {
+    if(n!=B.n || m!=B.m){
+        std::cerr << "Matrix Error! Undefined Addition!" << std::endl;
+        exit(-1);
+    }
+    for(int i = 0; i < n; i++)
+        for(int j = 0; j < m; j++)
+            element(i,j) -= B(i, j);
+    return (*this);
+}
+
 Matrix Matrix::operator + (const Matrix &B) const {
     if(n!=B.n || m!=B.m){
         std::cerr << "Matrix Error! Undefined Addition!" << std::endl;

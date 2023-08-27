@@ -55,6 +55,8 @@ public:
     RowVector getRow(const int &r) const;
     ColVector getCol(const int &c) const;
 
+    Matrix& operator += (const Matrix &B);
+    Matrix& operator -= (const Matrix &B);
     Matrix operator + (const Matrix &B) const;
     Matrix operator - () const;
     Matrix operator - (const Matrix &B) const;

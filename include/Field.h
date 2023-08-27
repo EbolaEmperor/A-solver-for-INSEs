@@ -26,6 +26,17 @@ public:
     ColVector& operator [] (const int &i){
         return u[i];
     }
+    Field& operator += (const Field &rhs){
+        u[0] = u[0] + rhs[0];
+        u[1] = u[1] + rhs[1];
+        return (*this);
+    }
+    friend Field operator * (const double &k, const Field &rhs){
+        Field res;
+        res[0] = k*rhs[0];
+        res[1] = k*rhs[1];
+        return res;
+    }
 };
 
 #endif

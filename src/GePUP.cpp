@@ -82,14 +82,135 @@ Field GePUP::Proj(const Field &u) const{
     return Field( u[0]-Gd(tmp,0), u[1]-Gd(tmp,1) );
 }
 
-ColVector GePUP::D(const TimeFunction2D *g, const double &t) const{
+ColVector GePUP::D(const TimeFunction2D *g[2], const double &t) const{
+    // Compute the body-average integration of div(g), with the divergence theorem.
     ColVector res(M*M);
     for(int i = 0; i < M; i++)
         for(int j = 0; j < M; j++){
-            res(idx(i,j)) = (- g[1].intFixY_order6(j*dH, i*dH, (i+1)*dH, t)
-                             + g[1].intFixY_order6((j+1)*dH, i*dH, (i+1)*dH, t)
-                             - g[0].intFixX_order6(i*dH, j*dH, (j+1)*dH, t)
-                             + g[0].intFixX_order6((i+1)*dH, j*dH, (j+1)*dH, t)) / (dH*dH);
+            res(idx(i,j)) = (- g[1]->intFixY_order6(j*dH, i*dH, (i+1)*dH, t)
+                             + g[1]->intFixY_order6((j+1)*dH, i*dH, (i+1)*dH, t)
+                             - g[0]->intFixX_order6(i*dH, j*dH, (j+1)*dH, t)
+                             + g[0]->intFixX_order6((i+1)*dH, j*dH, (j+1)*dH, t)) / (dH*dH);
         }
     return res;
+}
+
+double GePUP::face(const ColVector &phi, const idpair &i, const idpair &ed) const{
+    return (-value(phi,i+2*ed) + 7.0*value(phi,i+ed) + 7.0*value(phi,i) - value(phi,i-ed)) / 12.0;
+}
+
+double GePUP::GdVer(const ColVector &phi, const idpair &i, const idpair &ed) const{
+    idpair edVer = ed.transDirection();
+    return (face(phi,i+edVer,ed) - face(phi,i-edVer,ed)) / (2.0*dH);
+}
+
+double GePUP::F(const ColVector &phi, const ColVector &psi, const idpair &i, const idpair &ed) const{
+    if(isGhost1(i+ed)) return 0;
+    return face(phi,i,ed)*face(psi,i,ed) + (dH*dH/12.0) * GdVer(phi,i,ed)*GdVer(psi,i,ed);
+}
+
+Field GePUP::Duu(const Field &u) const{
+    Field res(M);
+    for(int dm = 0; dm < 2; dm++)
+        for(int i = 0; i < M; i++)
+            for(int j = 0; j < M; j++){
+                idpair id(i,j);
+                for(int d = 0; d < 2; d++){
+                    idpair ed; ed[d]=1;
+                    res[dm](idx(id)) += (F(u[d],u[dm],id,ed) - F(u[d],u[dm],id,ed)) / dH;
+                }
+            }
+    return res;
+}
+
+void GePUP::addElementForHomoDirichlet(std::vector<Triple> &elements, const int &row, const idpair &i, const double &coef){
+    if(inRange(i)) elements.emplace_back(row, idx(i), coef);
+    else if(isGhost1(i)){
+        idpair j=i, ed;
+        if(i[0]==-1) j[0]=0, ed[0]=-1;
+        if(i[0]==M) j[0]=M-1, ed[0]=1;
+        if(i[1]==-1) j[1]=0, ed[1]=-1;
+        if(i[1]==M) j[1]=M-1, ed[1]=1;
+        elements.emplace_back(row, idx(j), -77.0/12.0*coef);
+        elements.emplace_back(row, idx(j-ed), 43.0/12.0*coef);
+        elements.emplace_back(row, idx(j-2*ed), -17.0/12.0*coef);
+        elements.emplace_back(row, idx(j-3*ed), 3.0/12.0*coef);
+    } else if(isGhost2(i)){
+        idpair j=i, ed;
+        if(i[0]==-2) j[0]=0, ed[0]=-1;
+        if(i[0]==M+1) j[0]=M-1, ed[0]=1;
+        if(i[1]==-2) j[1]=0, ed[1]=-1;
+        if(i[1]==M+1) j[1]=M-1, ed[1]=1;
+        elements.emplace_back(row, idx(j), -505.0/12.0*coef);
+        elements.emplace_back(row, idx(j-ed), 335.0/12.0*coef);
+        elements.emplace_back(row, idx(j-2*ed), -145.0/12.0*coef);
+        elements.emplace_back(row, idx(j-3*ed), 27.0/12.0*coef);
+    } else {
+        std::cerr << "[Error] addElementForHomoDirichlet:: out of range!" << std::endl;
+        exit(-1);
+    }
+}
+
+void GePUP::addElementForNeumann(std::vector<Triple> &elements, const int &row, const idpair &i, const double &coef){
+    if(inRange(i)) elements.emplace_back(row, idx(i), coef);
+    else if(isGhost1(i)){
+        idpair j=i, ed;
+        if(i[0]==-1) j[0]=0, ed[0]=-1;
+        if(i[0]==M) j[0]=M-1, ed[0]=1;
+        if(i[1]==-1) j[1]=0, ed[1]=-1;
+        if(i[1]==M) j[1]=M-1, ed[1]=1;
+        elements.emplace_back(row, idx(j), 0.5*coef);
+        elements.emplace_back(row, idx(j-ed), 0.9*coef);
+        elements.emplace_back(row, idx(j-2*ed), -0.5*coef);
+        elements.emplace_back(row, idx(j-3*ed), 0.1*coef);
+    } else if(isGhost2(i)){
+        idpair j=i, ed;
+        if(i[0]==-2) j[0]=0, ed[0]=-1;
+        if(i[0]==M+1) j[0]=M-1, ed[0]=1;
+        if(i[1]==-2) j[1]=0, ed[1]=-1;
+        if(i[1]==M+1) j[1]=M-1, ed[1]=1;
+        elements.emplace_back(row, idx(j), -7.5*coef);
+        elements.emplace_back(row, idx(j-ed), 14.5*coef);
+        elements.emplace_back(row, idx(j-2*ed), -7.5*coef);
+        elements.emplace_back(row, idx(j-3*ed), 1.5*coef);
+    } else {
+        std::cerr << "[Error] addElementForHomoDirichlet:: out of range!" << std::endl;
+        exit(-1);
+    }
+}
+
+void GePUP::initialize(){
+    // Initialize the AMG solvers
+    std::vector<Triple> elements;
+    for(int i = 0; i < M; i++)
+        for(int j = 0; j < M; j++){
+            int row = idx(i,j);
+            idpair id(i,j);
+            addElementForHomoDirichlet(elements, row, id, -5.0/(dH*dH));
+            for(int d = 0; d < 2; d++){
+                idpair ed; ed[d]=1;
+                addElementForHomoDirichlet(elements, row, id-2*ed, -1.0/(12.0*dH*dH));
+                addElementForHomoDirichlet(elements, row, id-ed, 4.0/(3.0*dH*dH));
+                addElementForHomoDirichlet(elements, row, id+ed, 4.0/(3.0*dH*dH));
+                addElementForHomoDirichlet(elements, row, id+2*ed, -1.0/(12.0*dH*dH));
+            }
+        }
+    poissonDirichlet.generateGrid(SparseMatrix(M*M, M*M, elements));
+    
+    elements.clear();
+    for(int i = 0; i < M; i++)
+        for(int j = 0; j < M; j++){
+            int row = idx(i,j);
+            idpair id(i,j);
+            addElementForNeumann(elements, row, id, -5.0/(dH*dH));
+            for(int d = 0; d < 2; d++){
+                idpair ed; ed[d]=1;
+                addElementForNeumann(elements, row, id-2*ed, -1.0/(12.0*dH*dH));
+                addElementForNeumann(elements, row, id-ed, 4.0/(3.0*dH*dH));
+                addElementForNeumann(elements, row, id+ed, 4.0/(3.0*dH*dH));
+                addElementForNeumann(elements, row, id+2*ed, -1.0/(12.0*dH*dH));
+            }
+        }
+    poissonNeumann.generateGrid(SparseMatrix(M*M, M*M, elements));
+    poissonNeumann.setPureNeumann();
 }

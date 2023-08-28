@@ -1,4 +1,6 @@
 #include "GePUP.h"
+#include <fstream>
+#include <iomanip>
 
 double GePUP::value(const ColVector &phi, const idpair &i) const{
     if(inRange(i)) return phi(idx(i));
@@ -74,6 +76,7 @@ Field GePUP::Proj(const Field &u) const{
 ColVector GePUP::D(TimeFunction2D *const *g, const double &t) const{
     // Compute the body-average integration of div(g), with the divergence theorem.
     ColVector res(M*M);
+    if(noForcingTerm) return res;
     for(int i = 0; i < M; i++)
         for(int j = 0; j < M; j++){
             res(idx(i,j)) = (- g[1]->intFixY_order6(j*dH, i*dH, (i+1)*dH, t)
@@ -327,4 +330,15 @@ void GePUP::setTimeStepWithCaurant(const double &caurant, const double &maxux, c
     } else {
         dT = caurant / (maxux/dH + maxuy/dH);
     }
+}
+
+void GePUP::output(const std::string &outname) const{
+    std::cout << "--------------------------------------------------------------" << std::endl;
+    std::ofstream out(outname);
+    out << std::fixed << std::setprecision(16);
+    out << u[0].T() << std::endl;
+    out << u[1].T() << std::endl;
+    out.close();
+    std::cout << "Result has been saved to " << outname << std::endl;
+    std::cout << "--------------------------------------------------------------" << std::endl;
 }

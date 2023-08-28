@@ -64,6 +64,7 @@ public:
     void setNu(const double &_nu);
     void setEps(const double &_eps);
     void setTimeStepWithCaurant(const double &caurant, const double &maxux, const double &maxuy);
+    void output(const std::string &outname) const;
 };
 
 #endif

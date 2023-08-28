@@ -31,4 +31,4 @@ TimeFunction2D.o: include/TimeFunction2D.h src/TimeFunction2D.cpp
 	g++ -c src/TimeFunction2D.cpp -Iinclude -O2 -O3 -Ofast
 
 clean:
-	rm *.o
+	rm *.o test1

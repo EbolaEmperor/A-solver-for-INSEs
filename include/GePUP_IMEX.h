@@ -7,7 +7,6 @@ class GePUP_IMEX : public GePUP{
 private:
     amgSolver IRK;
 public:
-    GePUP_IMEX();
     void initialize();
     void solve();
 };

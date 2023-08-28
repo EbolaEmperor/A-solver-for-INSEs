@@ -1,25 +1,5 @@
 #include "GePUP.h"
 
-int GePUP::idx(const int &i, const int &j) const{
-    return i*M + j;
-}
-
-int GePUP::idx(const idpair &i) const{
-    return i[0]*M + i[1];
-}
-
-inline bool GePUP::inRange(const idpair &i) const{
-    return i[0]>=0 && i[0]<M && i[1]>=0 && i[1]<M;
-}
-
-inline bool GePUP::isGhost1(const idpair &i) const{
-    return i[0]==-1 || i[0]==M || i[1]==-1 || i[1]==M;
-}
-
-inline bool GePUP::isGhost2(const idpair &i) const{
-    return i[0]==-2 || i[0]==M+1 || i[1]==-2 || i[1]==M+1;
-}
-
 double GePUP::value(const ColVector &phi, const idpair &i) const{
     if(inRange(i)) return phi(idx(i));
     else if(isGhost1(i)){
@@ -75,6 +55,15 @@ ColVector GePUP::Gd(const ColVector &phi, const int &d) const{
 
 ColVector GePUP::D(const Field &u) const{
     return Gd(u[0],0) + Gd(u[1],1);
+}
+
+double GePUP::D(const Field &u, const idpair &id) const{
+    double res = 0;
+    for(int d = 0; d < 2; d++){
+        idpair ed; ed[d]=1;
+        res += (-value(u[d],id+2*ed) + 8.0*value(u[d],id+ed) -8.0*value(u[d],id-ed) + value(u[d],id-2*ed)) / (12.0*dH);
+    }
+    return res;
 }
 
 Field GePUP::Proj(const Field &u) const{
@@ -139,17 +128,58 @@ double GePUP::deltaUn(const Field &u, const idpair &j, const idpair &ed) const{
 }
 
 double GePUP::normalFace(TimeFunction2D *const *g, const double &t, const idpair &j, const idpair &ed) const{
+    // The average integration of g_n (the normal component of g) at face (on the bondary) j+0.5ed
+    int d = ed[0] ? 0 : 1;
+    double fg = (ed[d]==1) ? 1 : -1;
+    if(d==0) return fg * g[0]->intFixX_order6((j[0]+(ed[0]+1)/2)*dH, j[1]*dH, (j[1]+1)*dH, t) / dH;
+    else return fg * g[1]->intFixY_order6((j[1]+(ed[1]+1)/2)*dH, j[0]*dH, (j[0]+1)*dH, t) / dH;
 }
 
 double GePUP::normalPartialDivU(const Field &u, const idpair &j, const idpair &ed) const{
+    return (-415.0*D(u,j) + 161.0*D(u,j-ed) - 55.0*D(u,j-2*ed) + 9.0*D(u,j-3*ed)) / (72.0*dH);
 }
 
 double GePUP::normalPartialQ(const Field &u, TimeFunction2D *const *g, const double &t, const idpair &j, const idpair &ed) const{
+    return normalFace(g,t,j,ed) + nu*deltaUn(u,j,ed) - nu*normalPartialDivU(u,j,ed);
+}
+
+void GePUP::addRHSElementForNeumann(ColVector &rhs, const int &row, const idpair &i, const double &t, const double &coef) const{
+    if(inRange(i)) return;
+    else if(isGhost1(i)){
+        idpair j=i, ed;
+        if(i[0]==-1) j[0]=0, ed[0]=-1;
+        if(i[0]==M) j[0]=M-1, ed[0]=1;
+        if(i[1]==-1) j[1]=0, ed[1]=-1;
+        if(i[1]==M) j[1]=M-1, ed[1]=1;
+        rhs(row) -= coef * 1.2*dH*normalPartialQ(u,g,t,j,ed);
+    } else if(isGhost2(i)){
+        idpair j=i, ed;
+        if(i[0]==-2) j[0]=0, ed[0]=-1;
+        if(i[0]==M+1) j[0]=M-1, ed[0]=1;
+        if(i[1]==-2) j[1]=0, ed[1]=-1;
+        if(i[1]==M+1) j[1]=M-1, ed[1]=1;
+        rhs(row) -= coef * 6.0*dH*normalPartialQ(u,g,t,j,ed);
+    } else {
+        std::cerr << "[Error] addRHSElementForHomoDirichlet:: out of range!" << std::endl;
+        exit(-1);
+    }
 }
 
 ColVector GePUP::solveQ(const Field &u, TimeFunction2D *const * g, const double &t) const{
     ColVector rhs = D(g,t) - D(Duu(u));
-    // ...
+    for(int i = 0; i < M; i++)
+        for(int j = 0; j < M; j++){
+            if(i>=2 && i<M-2 && j>=2 && j<M-2) continue;
+            int row = idx(i,j);
+            idpair id(i,j);
+            for(int d = 0; d < 2; d++){
+                idpair ed; ed[d]=1;
+                addRHSElementForNeumann(rhs, row, id-2*ed, t, -1.0/(12.0*dH*dH));
+                addRHSElementForNeumann(rhs, row, id-ed, t, 4.0/(3.0*dH*dH));
+                addRHSElementForNeumann(rhs, row, id+ed, t, 4.0/(3.0*dH*dH));
+                addRHSElementForNeumann(rhs, row, id+2*ed, t, -1.0/(12.0*dH*dH));
+            }
+        }
     return poissonNeumann.solve(rhs, "FMG", 8, eps);
 }
 
@@ -254,4 +284,47 @@ void GePUP::initialize(){
         }
     poissonNeumann.generateGrid(SparseMatrix(M*M, M*M, elements));
     poissonNeumann.setPureNeumann();
+}
+
+void GePUP::setNoForcingTerm(){
+    noForcingTerm = true;
+}
+
+void GePUP::setForcingTerm(TimeFunction2D *_g[2]){
+    g[0] = _g[0];
+    g[1] = _g[1];
+}
+
+void GePUP::setInitial(TimeFunction2D *_initial[2]){
+    initial[0] = _initial[0];
+    initial[1] = _initial[1];
+}
+
+void GePUP::setGridSize(const int &_M){
+    M = _M;
+    dH = 1.0 / M;
+}
+
+void GePUP::setEndTime(const double &_tEnd){
+    tEnd = _tEnd;
+}
+
+void GePUP::setReynolds(const double &_R){
+    nu = 1.0/_R;
+}
+
+void GePUP::setNu(const double &_nu){
+    nu = _nu;
+}
+
+void GePUP::setEps(const double &_eps){
+    eps = _eps;
+}
+
+void GePUP::setTimeStepWithCaurant(const double &caurant, const double &maxux, const double &maxuy){
+    if(dH==0.0){
+        std::cerr << "[Error] setTimeStepWithCaurant: Please set grid size first." << std::endl;
+    } else {
+        dT = caurant / (maxux/dH + maxuy/dH);
+    }
 }

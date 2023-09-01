@@ -25,6 +25,29 @@ double GePUP::value(const ColVector &phi, const idpair &i) const{
     }
 }
 
+double GePUP::valueQ(const ColVector &phi, const idpair &i, const Field &u, TimeFunction2D *const *g, const double &t) const{
+    if(inRange(i)) return phi(idx(i));
+    else if(isGhost1(i)){
+        idpair j=i, ed;
+        if(i[0]==-1) j[0]=0, ed[0]=-1;
+        if(i[0]==M) j[0]=M-1, ed[0]=1;
+        if(i[1]==-1) j[1]=0, ed[1]=-1;
+        if(i[1]==M) j[1]=M-1, ed[1]=1;
+        return 0.5*phi(idx(j)) + 0.9*phi(idx(j-ed)) - 0.5*phi(idx(j-2*ed)) + 0.1*phi(idx(j-3*ed)) + 1.2*dH*normalPartialQ(u,g,t,j,ed);
+    } else if(isGhost2(i)){
+        idpair j=i, ed;
+        if(i[0]==-2) j[0]=0, ed[0]=-1;
+        if(i[0]==M+1) j[0]=M-1, ed[0]=1;
+        if(i[1]==-2) j[1]=0, ed[1]=-1;
+        if(i[1]==M+1) j[1]=M-1, ed[1]=1;
+        return -7.5*phi(idx(j)) + 14.5*phi(idx(j-ed)) - 7.5*phi(idx(j-2*ed)) + 1.5*phi(idx(j-3*ed)) + 6.0*dH*normalPartialQ(u,g,t,j,ed);
+    } else {
+        std::cerr << "[Error] valueQ:: out of range!" << std::endl;
+        exit(-1);
+        return -1;
+    }
+}
+
 ColVector GePUP::L(const ColVector &phi) const{
     ColVector res(M*M);
     for(int i = 0; i < M; i++)
@@ -50,7 +73,18 @@ ColVector GePUP::Gd(const ColVector &phi, const int &d) const{
     for(int i = 0; i < M; i++)
         for(int j = 0; j < M; j++){
             idpair id(i,j);
-            res(idx(id)) = (-value(u[d],id+2*ed) + 8.0*value(u[d],id+ed) -8.0*value(u[d],id-ed) + value(u[d],id-2*ed)) / (12.0*dH);
+            res(idx(id)) = (-value(phi,id+2*ed) + 8.0*value(phi,id+ed) -8.0*value(phi,id-ed) + value(phi,id-2*ed)) / (12.0*dH);
+        }
+    return res;
+}
+
+ColVector GePUP::GdQ(const ColVector &q, const int &d, const Field &u, TimeFunction2D *const *g, const double &t) const{
+    ColVector res(M*M);
+    idpair ed; ed[d]=1;
+    for(int i = 0; i < M; i++)
+        for(int j = 0; j < M; j++){
+            idpair id(i,j);
+            res(idx(id)) = (-valueQ(q,id+2*ed,u,g,t) + 8.0*valueQ(q,id+ed,u,g,t) -8.0*valueQ(q,id-ed,u,g,t) + valueQ(q,id-2*ed,u,g,t)) / (12.0*dH);
         }
     return res;
 }
@@ -143,7 +177,8 @@ double GePUP::normalPartialDivU(const Field &u, const idpair &j, const idpair &e
 }
 
 double GePUP::normalPartialQ(const Field &u, TimeFunction2D *const *g, const double &t, const idpair &j, const idpair &ed) const{
-    return normalFace(g,t,j,ed) + nu*deltaUn(u,j,ed) - nu*normalPartialDivU(u,j,ed);
+    double res = noForcingTerm ? 0 : normalFace(g,t,j,ed);
+    return res + nu*deltaUn(u,j,ed) - nu*normalPartialDivU(u,j,ed);
 }
 
 void GePUP::addRHSElementForNeumann(ColVector &rhs, const int &row, const idpair &i, const double &t, const double &coef) const{
@@ -169,7 +204,7 @@ void GePUP::addRHSElementForNeumann(ColVector &rhs, const int &row, const idpair
 }
 
 ColVector GePUP::solveQ(const Field &u, TimeFunction2D *const * g, const double &t) const{
-    ColVector rhs = D(g,t) - D(Duu(u));
+    ColVector rhs = noForcingTerm ? -D(Duu(u)) : D(g,t)-D(Duu(u));
     for(int i = 0; i < M; i++)
         for(int j = 0; j < M; j++){
             if(i>=2 && i<M-2 && j>=2 && j<M-2) continue;
@@ -188,12 +223,16 @@ ColVector GePUP::solveQ(const Field &u, TimeFunction2D *const * g, const double 
 
 Field GePUP::XE(const Field &u, const double &t) const{
     Field res;
-    res[0] = bodyAve(g[0],t);
-    res[1] = bodyAve(g[1],t);
+    if(!noForcingTerm){
+        res[0] = bodyAve(g[0],t);
+        res[1] = bodyAve(g[1],t);
+    } else {
+        res = Field(M);
+    }
     res -= Duu(u);
     auto q = solveQ(u,g,t);
-    res[0] -= Gd(q,0);
-    res[1] -= Gd(q,1);
+    res[0] -= GdQ(q,0,u,g,t);
+    res[1] -= GdQ(q,1,u,g,t);
     return res;
 }
 
@@ -287,6 +326,13 @@ void GePUP::initialize(){
         }
     poissonNeumann.generateGrid(SparseMatrix(M*M, M*M, elements));
     poissonNeumann.setPureNeumann();
+
+    u = Field(M);
+    w = Field(M);
+    for(int d = 0; d < 2; d++)
+        for(int i = 0; i < M; i++)
+            for(int j = 0; j < M; j++)
+                u[d](idx(i,j)) = w[d](idx(i,j)) = initial[d]->accInt2D(i*dH, (i+1)*dH, j*dH, (j+1)*dH, 0) / (dH*dH);
 }
 
 void GePUP::setNoForcingTerm(){
@@ -340,5 +386,16 @@ void GePUP::output(const std::string &outname) const{
     out << u[1].T() << std::endl;
     out.close();
     std::cout << "Result has been saved to " << outname << std::endl;
+    std::cout << "--------------------------------------------------------------" << std::endl;
+}
+
+void GePUP::outputVorticity(const std::string &outname) const{
+    std::cout << "--------------------------------------------------------------" << std::endl;
+    std::ofstream out(outname);
+    out << std::fixed << std::setprecision(16);
+    auto res = Gd(u[1],0) - Gd(u[0],1);
+    out << res.T() << std::endl;
+    out.close();
+    std::cout << "The vorticity has been saved to " << outname << std::endl;
     std::cout << "--------------------------------------------------------------" << std::endl;
 }

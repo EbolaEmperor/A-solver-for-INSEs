@@ -231,8 +231,8 @@ ColVector amgSolver::FMG(const int &d, const ColVector &rhs) const{
 
 ColVector amgSolver::solve(const ColVector &rhs, const string & method, const int &maxIter, const double &eps) const{
     //return Ah[0].LUsolve(rhs);
-    //cout << "--------------------------------------------------------------" << endl;
-    //cout << "Solving..." << endl;
+    cout << "--------------------------------------------------------------" << endl;
+    cout << "Solving..." << endl;
     int timest = clock();
     ColVector res(rhs.size()), newres;
     for(int T = 0; T < maxIter; T++){
@@ -245,11 +245,11 @@ ColVector amgSolver::solve(const ColVector &rhs, const string & method, const in
             newres.setZeroMean();
         }
         double relative_err = vecnorm(newres-res, 0);
-        //std::cerr << "Iteration " << T+1 << ":  residual=" << vecnorm(Ah[0]*newres-rhs, 0) << "  relative_error=" << relative_err << endl;
+        cout << "Iteration " << T+1 << ":  residual=" << vecnorm(Ah[0]*newres-rhs, 0) << "  relative_error=" << relative_err << endl;
         res = newres;
         if(relative_err < eps) break;
     }
-    //cout << "Solved in " << std::setprecision(3) << (double)(clock()-timest)/CLOCKS_PER_SEC << "s" << endl;
+    cout << "Solved in " << std::setprecision(3) << (double)(clock()-timest)/CLOCKS_PER_SEC << "s" << endl;
     //cout << std::setprecision(6) << "--------------------------------------------------------------" << endl;
     return res;
 }

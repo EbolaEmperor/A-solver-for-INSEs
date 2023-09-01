@@ -51,15 +51,10 @@ void GePUP_IMEX::initialize(){
 void GePUP_IMEX::solve(){
     initialize();
     using namespace ERK_ESDIRK_Table;
-    u = Field(M);
-    w = Field(M);
-    for(int d = 0; d < 2; d++)
-        for(int i = 0; i < M; i++)
-            for(int j = 0; j < M; j++)
-                u[d](idx(i,j)) = w[d](idx(i,j)) = initial[d]->accInt2D(i*dH, (i+1)*dH, j*dH, (j+1)*dH, 0) / (dH*dH);
     Field us[stage], ws[stage], XEus[stage];
     for(double t = 0.0; t+1e-12 < tEnd; t += dT){
         ws[0] = w;
+        std::cerr << "Time: " << t << std::endl;
         XEus[0] = XE(u,t);
         for(int s = 1; s < stage; s++){
             double ts = t + c[s]*dT;

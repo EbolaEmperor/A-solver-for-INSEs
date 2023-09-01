@@ -29,10 +29,12 @@ protected:
     inline bool isGhost1(const idpair &i) const {return i[0]==-1 || i[0]==M || i[1]==-1 || i[1]==M;}
     inline bool isGhost2(const idpair &i) const {return i[0]==-2 || i[0]==M+1 || i[1]==-2 || i[1]==M+1;}
     double value(const ColVector &phi, const idpair &i) const;
+    double valueQ(const ColVector &phi, const idpair &i, const Field &u, TimeFunction2D *const *g, const double &t) const;
 
     ColVector L(const ColVector &phi) const;
     Field L(const Field &u) const;
     ColVector Gd(const ColVector &phi, const int &d) const;
+    ColVector GdQ(const ColVector &q, const int &d, const Field &u, TimeFunction2D *const *g, const double &t) const;
     ColVector D(const Field &u) const;
     double D(const Field &u, const idpair &i) const;
     Field Proj(const Field &u) const;
@@ -65,6 +67,7 @@ public:
     void setEps(const double &_eps);
     void setTimeStepWithCaurant(const double &caurant, const double &maxux, const double &maxuy);
     void output(const std::string &outname) const;
+    void outputVorticity(const std::string &outname) const;
 };
 
 #endif

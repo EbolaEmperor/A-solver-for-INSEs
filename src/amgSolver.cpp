@@ -232,10 +232,10 @@ ColVector amgSolver::FMG(const int &d, const ColVector &rhs) const{
 ColVector amgSolver::solve(const ColVector &rhs, const string & method, const int &maxIter, const double &eps) const{
     //return Ah[0].LUsolve(rhs);
     cout << "--------------------------------------------------------------" << endl;
-    cout << "Solving..." << endl;
-    int timest = clock();
+    // cout << "Solving..." << endl;
+    int timest = clock(), T;
     ColVector res(rhs.size()), newres;
-    for(int T = 0; T < maxIter; T++){
+    for(T = 0; T < maxIter; T++){
         if(method == "V"){
             newres = VC(0, res, rhs);
         } else {
@@ -249,7 +249,8 @@ ColVector amgSolver::solve(const ColVector &rhs, const string & method, const in
         res = newres;
         if(relative_err < eps) break;
     }
-    cout << "Solved in " << std::setprecision(3) << (double)(clock()-timest)/CLOCKS_PER_SEC << "s" << endl;
+    if(T == maxIter) cout << "[Warning] AMG solver reaches the maximum iterations." << endl;
+    // cout << "Solved in " << std::setprecision(3) << (double)(clock()-timest)/CLOCKS_PER_SEC << "s" << endl;
     //cout << std::setprecision(6) << "--------------------------------------------------------------" << endl;
     return res;
 }

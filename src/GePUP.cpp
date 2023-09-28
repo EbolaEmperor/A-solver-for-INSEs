@@ -1,22 +1,24 @@
 #include "GePUP.h"
 #include <fstream>
 #include <iomanip>
+#include <assert.h>
 
 double GePUP::value(const ColVector &phi, const idpair &i) const{
     if(inRange(i)) return phi(idx(i));
     else if(isGhost1(i)){
         idpair j=i, ed;
         if(i[0]==-1) j[0]=0, ed[0]=-1;
-        if(i[0]==M) j[0]=M-1, ed[0]=1;
-        if(i[1]==-1) j[1]=0, ed[1]=-1;
-        if(i[1]==M) j[1]=M-1, ed[1]=1;
-        return (-77.0*phi(idx(j)) + 43.0*phi(idx(j-ed)) - 17.0*phi(idx(j-2*ed)) + 3.0*phi(idx(j-3*ed))) / 12.0;
+        else if(i[0]==M) j[0]=M-1, ed[0]=1;
+        else if(i[1]==-1) j[1]=0, ed[1]=-1;
+        else if(i[1]==M) j[1]=M-1, ed[1]=1;
+        return (-77.0*value(phi,j) + 43.0*value(phi,j-ed) - 17.0*value(phi,j-2*ed) + 3.0*value(phi,j-3*ed)) / 12.0;
     } else if(isGhost2(i)){
         idpair j=i, ed;
         if(i[0]==-2) j[0]=0, ed[0]=-1;
-        if(i[0]==M+1) j[0]=M-1, ed[0]=1;
-        if(i[1]==-2) j[1]=0, ed[1]=-1;
-        if(i[1]==M+1) j[1]=M-1, ed[1]=1;
+        else if(i[0]==M+1) j[0]=M-1, ed[0]=1;
+        else if(i[1]==-2) j[1]=0, ed[1]=-1;
+        else if(i[1]==M+1) j[1]=M-1, ed[1]=1;
+        assert(inRange(j));
         return (-505.0*phi(idx(j)) + 335.0*phi(idx(j-ed)) - 145.0*phi(idx(j-2*ed)) + 27.0*phi(idx(j-3*ed))) / 12.0;
     } else {
         std::cerr << "[Error] value:: out of range!" << std::endl;
@@ -30,16 +32,18 @@ double GePUP::valueQ(const ColVector &phi, const idpair &i, const Field &u, Time
     else if(isGhost1(i)){
         idpair j=i, ed;
         if(i[0]==-1) j[0]=0, ed[0]=-1;
-        if(i[0]==M) j[0]=M-1, ed[0]=1;
-        if(i[1]==-1) j[1]=0, ed[1]=-1;
-        if(i[1]==M) j[1]=M-1, ed[1]=1;
+        else if(i[0]==M) j[0]=M-1, ed[0]=1;
+        else if(i[1]==-1) j[1]=0, ed[1]=-1;
+        else if(i[1]==M) j[1]=M-1, ed[1]=1;
+        assert(inRange(j));
         return 0.5*phi(idx(j)) + 0.9*phi(idx(j-ed)) - 0.5*phi(idx(j-2*ed)) + 0.1*phi(idx(j-3*ed)) + 1.2*dH*normalPartialQ(u,g,t,j,ed);
     } else if(isGhost2(i)){
         idpair j=i, ed;
         if(i[0]==-2) j[0]=0, ed[0]=-1;
-        if(i[0]==M+1) j[0]=M-1, ed[0]=1;
-        if(i[1]==-2) j[1]=0, ed[1]=-1;
-        if(i[1]==M+1) j[1]=M-1, ed[1]=1;
+        else if(i[0]==M+1) j[0]=M-1, ed[0]=1;
+        else if(i[1]==-2) j[1]=0, ed[1]=-1;
+        else if(i[1]==M+1) j[1]=M-1, ed[1]=1;
+        assert(inRange(j));
         return -7.5*phi(idx(j)) + 14.5*phi(idx(j-ed)) - 7.5*phi(idx(j-2*ed)) + 1.5*phi(idx(j-3*ed)) + 6.0*dH*normalPartialQ(u,g,t,j,ed);
     } else {
         std::cerr << "[Error] valueQ:: out of range!" << std::endl;
@@ -103,7 +107,7 @@ double GePUP::D(const Field &u, const idpair &id) const{
 }
 
 Field GePUP::Proj(const Field &u) const{
-    auto tmp = poissonDirichlet.solve(D(u), "FMG", 7, eps);
+    auto tmp = poissonDirichlet.solve(D(u), "FMG", 20, eps);
     return Field( u[0]-Gd(tmp,0), u[1]-Gd(tmp,1) );
 }
 
@@ -143,7 +147,7 @@ Field GePUP::Duu(const Field &u) const{
                 idpair id(i,j);
                 for(int d = 0; d < 2; d++){
                     idpair ed; ed[d]=1;
-                    res[dm](idx(id)) += (F(u[d],u[dm],id,ed) - F(u[d],u[dm],id,ed)) / dH;
+                    res[dm](idx(id)) += (F(u[d],u[dm],id,ed) - F(u[d],u[dm],id,-ed)) / dH;
                 }
             }
     return res;
@@ -218,7 +222,8 @@ ColVector GePUP::solveQ(const Field &u, TimeFunction2D *const * g, const double 
                 addRHSElementForNeumann(rhs, row, id+2*ed, t, -1.0/(12.0*dH*dH));
             }
         }
-    return poissonNeumann.solve(rhs, "FMG", 8, eps);
+    // std::cerr << "---------------solveQ--------------" << std::endl;
+    return poissonNeumann.solve(rhs, "FMG", 20, eps);
 }
 
 Field GePUP::XE(const Field &u, const double &t) const{
@@ -324,6 +329,7 @@ void GePUP::initialize(){
                 addElementForNeumann(elements, row, id+2*ed, -1.0/(12.0*dH*dH));
             }
         }
+    poissonNeumann.setStrongThereshold(0.05);
     poissonNeumann.generateGrid(SparseMatrix(M*M, M*M, elements));
     poissonNeumann.setPureNeumann();
 

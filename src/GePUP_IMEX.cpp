@@ -54,7 +54,7 @@ void GePUP_IMEX::solve(){
     Field us[stage], ws[stage], XEus[stage];
     for(double t = 0.0; t+1e-12 < tEnd; t += dT){
         ws[0] = w;
-        std::cerr << "Time: " << t << std::endl;
+        std::cerr << "Time: " << t;
         XEus[0] = XE(u,t);
         for(int s = 1; s < stage; s++){
             double ts = t + c[s]*dT;
@@ -63,8 +63,9 @@ void GePUP_IMEX::solve(){
                 rhs += (dT*aE[s][j]) * XEus[j];
                 rhs += (dT*nu*aI[s][j]) * L(ws[j]);
             }
-            ws[s][0] = IRK.solve(rhs[0], "FMG", 8, eps);
-            ws[s][1] = IRK.solve(rhs[1], "FMG", 8, eps);
+            // std::cerr << "------------IRK-----------------" << std::endl;
+            ws[s][0] = IRK.solve(rhs[0], "FMG", 20, eps);
+            ws[s][1] = IRK.solve(rhs[1], "FMG", 20, eps);
             us[s] = Proj(ws[s]);
             XEus[s] = XE(us[s],ts);
         }
@@ -72,5 +73,6 @@ void GePUP_IMEX::solve(){
         for(int j = 0; j < stage; j++)
             wstar +=( dT*(b[j]-aE[stage-1][j]) ) * XEus[j];
         w = u = Proj(wstar);
+        std::cerr << " " << u[0].vecnorm(0) << " " << u[1].vecnorm(0) << std::endl;
     }
 }

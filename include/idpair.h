@@ -21,6 +21,9 @@ public:
     idpair operator + (const idpair &rhs) const{
         return idpair(x[0]+rhs[0], x[1]+rhs[1]);
     }
+    idpair operator - () const{
+        return idpair(-x[0], -x[1]);
+    }
     idpair operator - (const idpair &rhs) const{
         return idpair(x[0]-rhs[0], x[1]-rhs[1]);
     }

@@ -48,25 +48,38 @@ void GePUP_IMEX::initialize(){
     IRK.generateGrid(SparseMatrix(M*M, M*M, elements));
 }
 
+#include <fstream>
+
 void GePUP_IMEX::solve(){
     initialize();
+
+    auto tmpp = Proj(u);
+    std::ofstream ffout("testDiv.txt");
+    ffout << tmpp[0].T() << std::endl;
+    ffout << tmpp[1].T() << std::endl;
+    ffout << u[0].T() << std::endl;
+    ffout << u[1].T() << std::endl;
+    ffout.close();
+
     using namespace ERK_ESDIRK_Table;
-    Field us[stage], ws[stage], XEus[stage];
+    Field us[stage], ws[stage], XEus[stage], XIws[stage];
     for(double t = 0.0; t+1e-12 < tEnd; t += dT){
         ws[0] = w;
         std::cerr << "Time: " << t << std::endl;
         XEus[0] = XE(u,t);
+        XIws[0] = L(w);
         for(int s = 1; s < stage; s++){
             double ts = t + c[s]*dT;
             Field rhs = w;
             for(int j = 0; j < s; j++){
                 rhs += (dT*aE[s][j]) * XEus[j];
-                rhs += (dT*nu*aI[s][j]) * L(ws[j]);
+                rhs += (dT*nu*aI[s][j]) * XIws[j];
             }
             ws[s][0] = IRK.solve(rhs[0], "FMG", 8, eps);
             ws[s][1] = IRK.solve(rhs[1], "FMG", 8, eps);
             us[s] = Proj(ws[s]);
             XEus[s] = XE(us[s],ts);
+            if(s < stage-1) XIws[s] = L(ws[s]);
         }
         Field wstar = ws[stage-1];
         for(int j = 0; j < stage; j++)

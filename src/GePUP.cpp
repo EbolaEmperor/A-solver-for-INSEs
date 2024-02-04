@@ -103,7 +103,7 @@ double GePUP::D(const Field &u, const idpair &id) const{
 }
 
 Field GePUP::Proj(const Field &u) const{
-    auto tmp = poissonDirichlet.solve(D(u), "FMG", 7, eps);
+    auto tmp = poissonNeumann.solve(D(u), "FMG", 7, eps*100);
     return Field( u[0]-Gd(tmp,0), u[1]-Gd(tmp,1) );
 }
 
@@ -131,7 +131,7 @@ double GePUP::GdVer(const ColVector &phi, const idpair &i, const idpair &ed) con
 }
 
 double GePUP::F(const ColVector &phi, const ColVector &psi, const idpair &i, const idpair &ed) const{
-    if(isGhost1(i+ed)) return 0;
+    if(inRange(i) && isGhost1(i+ed) || inRange(i+ed) && isGhost1(i)) return 0;
     return face(phi,i,ed)*face(psi,i,ed) + (dH*dH/12.0) * GdVer(phi,i,ed)*GdVer(psi,i,ed);
 }
 
@@ -143,7 +143,7 @@ Field GePUP::Duu(const Field &u) const{
                 idpair id(i,j);
                 for(int d = 0; d < 2; d++){
                     idpair ed; ed[d]=1;
-                    res[dm](idx(id)) += (F(u[d],u[dm],id,ed) - F(u[d],u[dm],id,ed)) / dH;
+                    res[dm](idx(id)) += (F(u[d],u[dm],id,ed) - F(u[d],u[dm],id-ed,ed)) / dH;
                 }
             }
     return res;
@@ -244,20 +244,26 @@ void GePUP::addElementForHomoDirichlet(std::vector<Triple> &elements, const int 
         if(i[0]==M) j[0]=M-1, ed[0]=1;
         if(i[1]==-1) j[1]=0, ed[1]=-1;
         if(i[1]==M) j[1]=M-1, ed[1]=1;
-        elements.emplace_back(row, idx(j), -77.0/12.0*coef);
-        elements.emplace_back(row, idx(j-ed), 43.0/12.0*coef);
-        elements.emplace_back(row, idx(j-2*ed), -17.0/12.0*coef);
-        elements.emplace_back(row, idx(j-3*ed), 3.0/12.0*coef);
+        // elements.emplace_back(row, idx(j), -77.0/12.0*coef);
+        // elements.emplace_back(row, idx(j-ed), 43.0/12.0*coef);
+        // elements.emplace_back(row, idx(j-2*ed), -17.0/12.0*coef);
+        // elements.emplace_back(row, idx(j-3*ed), 3.0/12.0*coef);
+        elements.emplace_back(row, idx(j), -13.0/3.0*coef);
+        elements.emplace_back(row, idx(j-ed), 5.0/3.0*coef);
+        elements.emplace_back(row, idx(j-2*ed), -1.0/3.0*coef);
     } else if(isGhost2(i)){
         idpair j=i, ed;
         if(i[0]==-2) j[0]=0, ed[0]=-1;
         if(i[0]==M+1) j[0]=M-1, ed[0]=1;
         if(i[1]==-2) j[1]=0, ed[1]=-1;
         if(i[1]==M+1) j[1]=M-1, ed[1]=1;
-        elements.emplace_back(row, idx(j), -505.0/12.0*coef);
-        elements.emplace_back(row, idx(j-ed), 335.0/12.0*coef);
-        elements.emplace_back(row, idx(j-2*ed), -145.0/12.0*coef);
-        elements.emplace_back(row, idx(j-3*ed), 27.0/12.0*coef);
+        // elements.emplace_back(row, idx(j), -505.0/12.0*coef);
+        // elements.emplace_back(row, idx(j-ed), 335.0/12.0*coef);
+        // elements.emplace_back(row, idx(j-2*ed), -145.0/12.0*coef);
+        // elements.emplace_back(row, idx(j-3*ed), 27.0/12.0*coef);
+        elements.emplace_back(row, idx(j), -70.0/3.0*coef);
+        elements.emplace_back(row, idx(j-ed), 32.0/3.0*coef);
+        elements.emplace_back(row, idx(j-2*ed), -7.0/3.0*coef);
     } else {
         std::cerr << "[Error] addElementForHomoDirichlet:: out of range!" << std::endl;
         exit(-1);
@@ -381,7 +387,7 @@ void GePUP::setTimeStepWithCaurant(const double &caurant, const double &maxux, c
 void GePUP::output(const std::string &outname) const{
     std::cout << "--------------------------------------------------------------" << std::endl;
     std::ofstream out(outname);
-    out << std::fixed << std::setprecision(16);
+    out << std::fixed << std::setprecision(8);
     out << u[0].T() << std::endl;
     out << u[1].T() << std::endl;
     out.close();
@@ -392,7 +398,7 @@ void GePUP::output(const std::string &outname) const{
 void GePUP::outputVorticity(const std::string &outname) const{
     std::cout << "--------------------------------------------------------------" << std::endl;
     std::ofstream out(outname);
-    out << std::fixed << std::setprecision(16);
+    out << std::fixed << std::setprecision(8);
     auto res = Gd(u[1],0) - Gd(u[0],1);
     out << res.T() << std::endl;
     out.close();

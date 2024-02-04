@@ -25,9 +25,9 @@ int main(int argc, char* argv[]){
 
     GePUP_IMEX solver;
     solver.setGridSize(stoi(argv[1]));
-    solver.setEndTime(5);
+    solver.setEndTime(stod(argv[2]));
     solver.setReynolds(1e4);
-    solver.setTimeStepWithCaurant(stod(argv[2]), 1.0, 1.0);
+    solver.setTimeStepWithCaurant(stod(argv[3]), 1.0, 1.0);
     solver.setNoForcingTerm();
     solver.setInitial(u);
     solver.setEps(1e-9);
